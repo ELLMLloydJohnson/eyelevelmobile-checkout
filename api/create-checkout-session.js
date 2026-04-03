@@ -33,7 +33,8 @@ export default async function handler(req, res) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${data.package} Package Deposit - Eye Level Mobile`
+              name: `${data.package} Package Deposit - Eye Level Mobile`,
+              description: `${data.billingMode || ''} deposit for ${data.route || ''}`.trim()
             },
             unit_amount: Math.round(Number(data.depositAmount) * 100)
           },
