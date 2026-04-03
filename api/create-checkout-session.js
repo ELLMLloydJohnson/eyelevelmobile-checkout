@@ -3,6 +3,14 @@ import Stripe from "stripe";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "https://eyelevelmobile.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -25,20 +33,18 @@ export default async function handler(req, res) {
     if (!packageName) return res.status(400).json({ error: "Missing package" });
     if (!term) return res.status(400).json({ error: "Missing term" });
     if (!billingMode) return res.status(400).json({ error: "Missing billingMode" });
-    if (typeof depositAmount !== "number" || depositAmount <= 0) {
+    if (typeof depositAmount !== "number" || !Number.isFinite(depositAmount) || depositAmount <= 0) {
       return res.status(400).json({ error: "Invalid depositAmount" });
     }
 
-    const origin =
-      req.headers.origin ||
-      process.env.PUBLIC_SITE_URL ||
-      "https://eyelevelmobile.com";
+    const successUrl = "https://eyelevelmobile.com/mobile-shared-access-agreement?payment=success";
+    const cancelUrl = "https://eyelevelmobile.com/mobile-shared-access-agreement?payment=cancel";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: email,
-      success_url: `${origin}/mobile-shared-access-agreement?payment=success`,
-      cancel_url: `${origin}/mobile-shared-access-agreement?payment=cancel`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       payment_method_types: ["card"],
       line_items: [
         {
