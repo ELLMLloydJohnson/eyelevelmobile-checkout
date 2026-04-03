@@ -1,81 +1,62 @@
-import Stripe from "stripe";
+import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "https://eyelevelmobile.com");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    const {
-      name,
-      email,
-      route,
-      package: packageName,
-      term,
-      billingMode,
-      selectedAmount,
-      depositAmount
-    } = req.body || {};
+    const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    if (!name) return res.status(400).json({ error: "Missing name" });
-    if (!email) return res.status(400).json({ error: "Missing email" });
-    if (!route) return res.status(400).json({ error: "Missing route" });
-    if (!packageName) return res.status(400).json({ error: "Missing package" });
-    if (!term) return res.status(400).json({ error: "Missing term" });
-    if (!billingMode) return res.status(400).json({ error: "Missing billingMode" });
-    if (typeof depositAmount !== "number" || !Number.isFinite(depositAmount) || depositAmount <= 0) {
-      return res.status(400).json({ error: "Invalid depositAmount" });
+    if (!data) {
+      return res.status(400).json({ error: 'Missing request body.' });
     }
 
-    const successUrl = "https://eyelevelmobile.com/mobile-shared-access-agreement?payment=success";
-    const cancelUrl = "https://eyelevelmobile.com/mobile-shared-access-agreement?payment=cancel";
+    if (!data.depositAmount || Number(data.depositAmount) <= 0) {
+      return res.status(400).json({
+        error: 'Invalid depositAmount.',
+        received: data.depositAmount
+      });
+    }
+
+    if (!data.package) {
+      return res.status(400).json({ error: 'Missing package.' });
+    }
 
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer_email: email,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      payment_method_types: ["card"],
+      mode: 'payment',
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: 'usd',
             product_data: {
-              name: `Eye Level Mobile Deposit - ${packageName}`,
-              description: `${billingMode} deposit for ${route}`
+              name: `${data.package} Package Deposit - Eye Level Mobile`
             },
-            unit_amount: Math.round(depositAmount * 100)
+            unit_amount: Math.round(Number(data.depositAmount) * 100)
           },
           quantity: 1
         }
       ],
+      success_url: 'https://eyelevelmobile.com/success',
+      cancel_url: 'https://eyelevelmobile.com/cancel',
+      customer_email: data.email || undefined,
       metadata: {
-        name: String(name || ""),
-        email: String(email || ""),
-        route: String(route || ""),
-        package: String(packageName || ""),
-        term: String(term || ""),
-        billingMode: String(billingMode || ""),
-        selectedAmount: String(selectedAmount || ""),
-        depositAmount: String(depositAmount || "")
+        customer_name: data.name || '',
+        package: data.package || '',
+        route: data.route || '',
+        term: data.term || '',
+        campaignStart: data.campaignStart || ''
       }
     });
 
-    return res.status(200).json({ sessionId: session.id });
+    return res.status(200).json({ id: session.id });
   } catch (error) {
-    console.error("Stripe error:", error);
-    return res.status(500).json({
-      error: error.message || "Unable to create checkout session"
+    console.error('Stripe session creation error:', error);
+    return res.status(400).json({
+      error: error.message || 'Stripe session creation failed.'
     });
   }
 }
